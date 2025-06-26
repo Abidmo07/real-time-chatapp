@@ -79,6 +79,7 @@ useEffect(() => {
 
   const sendMessage = async (e) => {
     e.preventDefault();
+    if(!message || message.trim()==="") return;
     const { data, error: sendError } = await supabase.from('messages').insert({
       sender_id: currentUser.user.id,
       receiver_id: selectedUser.selectedUser.id,
@@ -86,7 +87,6 @@ useEffect(() => {
     })
     setMessage('');
     if (sendError) return console.log("error", sendError)
-    if (data) return console.log("sahit chikh")
 
   }
   return (

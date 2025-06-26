@@ -1,7 +1,6 @@
 "use client";
 
 import React, { createContext, useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { FaSearch, FaEllipsisV, FaTimes } from 'react-icons/fa';
 import { supabase } from '../supabase';
 import { useRouter } from 'next/navigation';
@@ -11,13 +10,18 @@ export const SelectedUserContext = createContext();
 export default function ChatLayout({ children }) {
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [searched,setSearched]=useState("");
+    const [searchedUsers,setSearchedUsers]=useState([])
     const router=useRouter();
+
 
     // Fetch other users
     useEffect(() => {
+        let interval
         const fetchOtherUsers = async () => {
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError || !user) return console.error(userError?.message || 'No user');
+
 
             const { data, error } = await supabase
                 .from('users')
@@ -26,9 +30,16 @@ export default function ChatLayout({ children }) {
             if (error) return console.error(error.message);
 
             setUsers(data);
+            setSearchedUsers(data);
         };
-        fetchOtherUsers();
+
+        interval=setInterval(fetchOtherUsers,10000)
+        return ()=>clearInterval(interval)
+
     }, []);
+    useEffect(()=>{
+
+    })
 
     // Logout function
     const handleLogout = async () => {
@@ -40,6 +51,31 @@ export default function ChatLayout({ children }) {
 
         }
     };
+    useEffect(()=>{
+      if(!searched || searched.trim()===""){
+        setSearchedUsers(users);
+      }
+      const filtred=users.filter((user)=>user.full_name?.toLowerCase().includes(searched.toLowerCase()));
+      setSearchedUsers(filtred);
+    },[searched])
+
+    useEffect(()=>{
+      // for tracking online users
+      let interval;
+            const updateLastSeen=async()=>{
+               const { data: { user } } = await supabase.auth.getUser();
+               if(!user) return;
+              await supabase.from("users").update({last_seen_at: new Date().toISOString()}).eq('id',user.id)
+            }
+            updateLastSeen();
+           interval= setInterval(updateLastSeen,30000)
+           return ()=>clearInterval(interval)
+    },[])
+    const isOnline=(lastSeenAt)=>{
+        const diff=Date.now()-new Date(lastSeenAt).getTime();
+        return diff<40000
+
+    }
 
     return (
         <div className="flex h-screen bg-gradient-to-tr from-gray-900 via-gray-800 to-gray-900">
@@ -52,11 +88,13 @@ export default function ChatLayout({ children }) {
                         type="text"
                         placeholder="Search friends..."
                         className="w-full pl-12 pr-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onChange={(e)=>setSearched(e.target.value)}
+                        value={searched}
                     />
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     <ul className="space-y-4">
-                        {users.map((user) => (
+                        {searchedUsers.map((user) => (
                             <li
                                 onClick={() => setSelectedUser(user)}
                                 key={user.id}
@@ -67,7 +105,7 @@ export default function ChatLayout({ children }) {
                                     <h4 className="text-white font-semibold">{user.full_name}</h4>
                                     <p className="text-gray-400 text-sm truncate">In a meeting...</p>
                                 </div>
-                                <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+                                <span className={`w-3 h-3 ${isOnline(user.last_seen_at)?'bg-green-500':'bg-red-500'}  rounded-full`}></span>
                             </li>
                         ))}
                     </ul>
@@ -82,7 +120,7 @@ export default function ChatLayout({ children }) {
                         {selectedUser ? (
                             <div>
                                 <h2 className="text-2xl font-bold text-white">{selectedUser.full_name}</h2>
-                                <span className="text-sm text-gray-400">Online</span>
+                                <span className="text-sm text-gray-400">{isOnline(selectedUser.last_seen_at)?"online":"offline"}</span>
                             </div>
                         ) : (
                             <div>
