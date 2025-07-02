@@ -20,7 +20,7 @@ export default function RegisterPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: 'http://localhost:3000/chat',
+        redirectTo: 'https://real-time-chatapp-chi.vercel.app/chat',
       },
     });
     if (error) console.error("OAuth error:", error.message);
